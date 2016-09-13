@@ -7,12 +7,16 @@ buildscript {
 	}
 	dependencies {
 		classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+		classpath('se.transmode.gradle:gradle-docker:1.2')
 	}
+	
 }
 
 apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'spring-boot'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'docker'
 
 jar {
 	baseName = 'divecenter-manager'
@@ -27,13 +31,46 @@ repositories {
 
 
 dependencies {
-	compile('org.springframework.cloud:spring-cloud-starter-oauth2')
-	compile('org.springframework.cloud:spring-cloud-starter')
-	testCompile('org.springframework.boot:spring-boot-starter-test')
+
+    compile("org.springframework.boot:spring-boot-starter-web")
+    compile("org.springframework.boot:spring-boot-starter-actuator")
+    testCompile("org.springframework.boot:spring-boot-starter-test")
+    testCompile("junit:junit")
+	
+	
 }
 
 dependencyManagement {
 	imports {
 		mavenBom "org.springframework.cloud:spring-cloud-dependencies:Brixton.SR5"
+		//mavenBom 'org.springframework.cloud:spring-cloud-config:1.1.3.RELEASE'
 	}
+}
+
+docker {
+    baseImage("java:8")
+    maintainer("Redbee")
+}
+
+task buildDocker(type: Docker, dependsOn: build) {
+    push = false
+    dryRun = true
+    applicationName = jar.baseName
+
+    doFirst {
+        copy {
+            from jar
+            into stageDir
+        }
+    }
+
+    volume("/tmp", "/log")
+    addFile("${jar.baseName}-${project.version}.jar", "app.jar")
+    runCommand("bash -c 'touch /app.jar'")
+    //entryPoint(["java","-Djava.security.egd=file:/dev/./urandom","-Dspring.profiles.active=desa", "-jar","/app.jar"])
+    entryPoint(["java","-Djava.security.egd=file:/dev/./urandom","-jar","/app.jar"])
+}
+
+bootRun{
+    jvmArgs = [ "-Dspring.profiles.active=desa" ]
 }
